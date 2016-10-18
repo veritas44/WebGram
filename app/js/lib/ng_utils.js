@@ -1431,7 +1431,7 @@ angular.module('izhukov.utils', [])
         if (text.match(/^`*$/)) {
           newText.push(match[0])
         }
-        else if (match[3]) { // pre,code,italic
+        else if (match[3]) { // pre,bold,italic
           if (match[5] == '\n') {
             match[5] = ''
             rawOffset -= 1
@@ -1448,7 +1448,7 @@ angular.module('izhukov.utils', [])
             length: text.length
           })
           rawOffset -= match[2].length + match[4].length
-        } else if (match[8]) { // code, bold,italic
+        } else if (match[8]) { // code
           newText.push(match[6] + text + match[9])
           entities.push({
             _: 'messageEntityCode',

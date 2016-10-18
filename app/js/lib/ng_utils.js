@@ -1238,8 +1238,14 @@ angular.module('izhukov.utils', [])
     var soundcloudRegExp = /^https?:\/\/(?:soundcloud\.com|snd\.sc)\/([a-zA-Z0-9%\-\_]+)\/([a-zA-Z0-9%\-\_]+)/i
     var spotifyRegExp = /(https?:\/\/(open\.spotify\.com|play\.spotify\.com|spoti\.fi)\/(.+)|spotify:(.+))/i
 
-    var markdownRegExp = /(^|\s)(````?)([\s\S]+?)(````?)([\s\n\.,:?!;]|$)|(^|\s)`([^\n]+?)`([\s\.,:?!;]|$)|@(\d+)\s*\((.+?)\)/
-
+    //var markdownRegExp = /(^|\s)(````?)([\s\S]+?)(````?)([\s\n\.,:?!;]|$)|(^|\s)`([^\n]+?)`([\s\.,:?!;]|$)|@(\d+)\s*\((.+?)\)/
+    /* */
+    var markdownRegExp   = new RegExp('(^|\\s)(`{3,4}|\\*|_)([\\s\\S]+?)(\\2)([\\s\\n\\.,:?!;]|$)' //1 2 3 4 5
+                                      +'|(^|\\s)([`])([^\\n]+?)\\7([\\s\\.,:?!;]|$)' // 6 7 8 9
+                                      +'|@(\\d+)\\s*\\((.+?)\\)' //10 11
+                                      //+'|(\\[(.+?)\\]\\((' + urlRegExp + ')\\))' //12 13 14   15 16
+                                    );
+    /* */        
     var siteHashtags = {
       Telegram: 'tg://search_hashtag?hashtag={1}',
       Twitter: 'https://twitter.com/hashtag/{1}',
@@ -1402,7 +1408,10 @@ angular.module('izhukov.utils', [])
     }
 
     function parseMarkdown (text, entities, noTrim) {
-      if (text.indexOf('`') == -1 && text.indexOf('@') == -1) {
+      if (text.indexOf('`') == -1 && text.indexOf('@') == -1 
+        && text.indexOf('*') == -1 && text.indexOf('_') == -1 
+        //&& text.indexOf('[') == -1
+      ) {
         return noTrim ? text : text.trim()
       }
       var raw = text
@@ -1414,7 +1423,7 @@ angular.module('izhukov.utils', [])
         matchIndex = rawOffset + match.index
         newText.push(raw.substr(0, match.index))
 
-        var text = (match[3] || match[7] || match[10])
+        var text = (match[3] || match[8] || match[11]) // || match[12])
         rawOffset -= text.length
         text = text.replace(/^\s+|\s+$/g, '')
         rawOffset += text.length
@@ -1422,37 +1431,79 @@ angular.module('izhukov.utils', [])
         if (text.match(/^`*$/)) {
           newText.push(match[0])
         }
-        else if (match[3]) { // pre
+        else if (match[3]) { // pre,code,italic
           if (match[5] == '\n') {
             match[5] = ''
             rawOffset -= 1
           }
           newText.push(match[1] + text + match[5])
           entities.push({
-            _: 'messageEntityPre',
+            _: 'messageEntity' + {
+                '`': 'Pre',
+                '*': 'Bold',
+                _: 'Italic'
+            }[match[2][0]],
             language: '',
             offset: matchIndex + match[1].length,
             length: text.length
           })
           rawOffset -= match[2].length + match[4].length
-        } else if (match[7]) { // code
-          newText.push(match[6] + text + match[8])
+        } else if (match[8]) { // code, bold,italic
+          newText.push(match[6] + text + match[9])
           entities.push({
             _: 'messageEntityCode',
             offset: matchIndex + match[6].length,
             length: text.length
           })
           rawOffset -= 2
-        } else if (match[10]) { // custom mention
+        } else if (match[11]) { // custom mention
           newText.push(text)
           entities.push({
             _: 'messageEntityMentionName',
-            user_id: match[9],
+            user_id: match[10],
             offset: matchIndex,
             length: text.length
           })
           rawOffset -= match[0] - text.length
         }
+        /* messageEntityTextUrl not enabled by the API *
+        else if (match[12]){
+         var url = false
+         var protocol = match[15]
+         var tld = match[16]
+         var excluded = ''
+
+         if (tld) { // URL
+           if (!protocol && (tld.substr(0, 4) === 'xn--' || Config.TLD.indexOf(tld.toLowerCase()) !== -1)) {
+             protocol = 'http://'
+           }
+
+           if (protocol) {
+             var balanced = checkBrackets(match[(14)])
+
+             if (balanced.length !== match[14].length) {
+               excluded = match[14].substring(balanced.length)
+               match[14] = balanced
+             }
+
+             url = (match[15] ? '' : protocol) + match[14]
+           }
+         } else { // IP address
+           url = (match[15] ? '' : 'http://') + match[14]
+         }
+         newText.push(match[13])
+         
+         if (url) {
+           entities.push({
+             _: 'messageEntityTextUrl',
+             url: url,
+             offset: matchIndex + 1,
+             length: match[13].length
+           })
+         }
+         rawOffset -= match[12].length - match[13].length
+        }
+        /* */
         raw = raw.substr(match.index + match[0].length)
         rawOffset += match.index + match[0].length
       }
@@ -1466,6 +1517,11 @@ angular.module('izhukov.utils', [])
       if (!entities.length && !noTrim) {
         newText = newText.trim()
       }
+      
+      if (entities.length) {
+        console.log('parse MarkdownEntities', newText, entities.slice())
+      }
+      
       return newText
     }
 

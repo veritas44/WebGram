@@ -1,3 +1,6 @@
+all:
+	./node_modules/gulp/bin/gulp.js
+
 package:
 	rm -rf dist_package
 	./node_modules/gulp/bin/gulp.js clean
